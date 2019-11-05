@@ -1,0 +1,16 @@
+{
+  "audio": {
+    "play-sound": true
+  },
+  "hoppie": {
+    "address": "http://www.hoppie.nl/acars/system/connect.html",
+    "login-code": "YOUR-LOGIN-CODE",
+    "poll-interval": 5
+  },
+  "printer": {
+    "enable": true,
+    "print-by-default": true,
+    "product": "0x0416",
+    "vendor": "0x5011"
+  }
+}
