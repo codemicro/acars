@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AboutInfoReq</class>
+ <widget class="QWidget" name="AboutInfoReq">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>141</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>400</width>
+    <height>141</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>400</width>
+    <height>141</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>About InfoReq</string>
+  </property>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>381</width>
+     <height>281</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>For an InfoReq message, you can choose to either request a METAR, short TAF, TAF or VATSIM ATIS text from VATSIM for the airport supplied in the &quot;Airport&quot; field as an ICAO code. If you request a METAR or either type of TAF, data is pulled from NOAA by Hoppie then relayed back to you. If you choose a VATSIM ATIS, Hoppie will take the ATIS text from VATSIM if there is a controller online and broadcasting an ATIS for that airport. If not, a message is returned saying &quot;not available&quot;.</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+   </property>
+   <property name="wordWrap">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButton">
+   <property name="geometry">
+    <rect>
+     <x>274</x>
+     <y>110</y>
+     <width>111</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Close</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
