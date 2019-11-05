@@ -857,9 +857,6 @@ def show_settings():
             # audio stuff
             proto["audio"]["play-sound"] = True if SettingsUi.audioPlaySoundBox.checkState() == 2 else False
 
-            pprint(proto)
-            pprint(original_settings)
-
             if proto["printer"]["enable"] and (original_settings["printer"]["enable"] != proto["printer"]["enable"]):
                 pos.product_id = int(proto["printer"]["product"], base=16)
                 pos.vendor_id = int(proto["printer"]["vendor"], base=16)
