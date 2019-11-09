@@ -36,7 +36,9 @@ except NotImplementedError:
 
 This is required because, while the ESCPOS library works on Windows, it is not designed to run on Windows, and hence sometimes does stuff like above, where it makes calls to the kernel for things that Windows just doesn't do.
 
-After this, you should download the LibUSB library from [here](http://sourceforge.net/projects/libusb/files/libusb-1.0/libusb-1.0.20/libusb-1.0.20.7z/download), and depending on your system architecture, do the following operations:
+### Setup
+
+Now download the LibUSB library from [here](http://sourceforge.net/projects/libusb/files/libusb-1.0/libusb-1.0.20/libusb-1.0.20.7z/download), and depending on your system architecture, do the following operations:
 
 * On 64-bit Windows:
   * Copy `MS64\dll\libusb-1.0.dll` to `C:\Windows\System32`
@@ -46,8 +48,6 @@ After this, you should download the LibUSB library from [here](http://sourceforg
   * `MS32\static\libusb-1.0.lib` to `<python>\Lib`
 
 This is required as Python needs access to the LIB file and the DLL file has to be in a location in the system PATH. The simplest place for this is System32.
-
-### Setup
 
 At this point, you should have all the pre-requisites setup and you can install the new printer driver for the POS printer.
 
