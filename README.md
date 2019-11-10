@@ -1,6 +1,6 @@
 # ACARS
 
-###### A graphical frontend for Hoppie's ACARS system, including POS printer integration
+###### A new client for Hoppie's ACARS system, including POS printer integration
 
 ACARS is a Python program written in order to make using Hoppie with your flight simulator and POS printer easy.
 
