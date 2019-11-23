@@ -4,7 +4,7 @@
 
 ACARS is a Python program written in order to make using Hoppie with your flight simulator and POS printer easy.
 
-Only Windows is supported (will possibly run on Linux)
+Only Windows is supported (will ~~possibly~~ absolutely not run on Linux)
 
 ### Installation
 
