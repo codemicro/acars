@@ -16,7 +16,7 @@ from escpos.printer import Dummy, Usb
 from loguru import logger
 from usb.core import USBError, NoBackendError
 
-import gui
+from gui import maingui
 
 # DEBUG
 sys._excepthook = sys.excepthook
@@ -25,13 +25,10 @@ def exception_hook(exctype, value, traceback):
     sys.exit(1)
 sys.excepthook = exception_hook
 
-
-SETTINGS_FILE = "settings.json"
-SETTINGS = json.loads(open(SETTINGS_FILE).read())
-LOGON_CODE = SETTINGS["hoppie"]["login-code"]
-SERVER_ADDR = SETTINGS["hoppie"]["address"]
+SETTINGS_FILE = "settings.json"  # TODO: AppData?
 
 session = requests.session()
+# disguises :P
 session.headers.update({"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/71.0"})
 
 station_name = ""
@@ -46,18 +43,41 @@ message_log = []
 
 
 def load_settings():
+    """
+    Loads JSON into a dict from the file specified in SETTINGS_FILE
+    """
+
     global SETTINGS
+    global LOGON_CODE
+    global SERVER_ADDR
 
     SETTINGS = json.loads(open(SETTINGS_FILE).read())
+    LOGON_CODE = SETTINGS["hoppie"]["login-code"]
+    SERVER_ADDR = SETTINGS["hoppie"]["address"]
+
+
+load_settings()
 
 
 def write_settings():
+    """
+    Takes the contents of the SETTINGS var, turns it into JSON and saves it to the path in SETTINGS_FILE
+
+    :return: nil
+    """
+
     global SETTINGS
 
     open(SETTINGS_FILE, "w").write(json.dumps(SETTINGS, sort_keys=True, indent=2))
 
 
 def setup_logging():
+    """
+    Removes all Loguru hooks, and adds the error log
+
+    :return: nil
+    """
+
     logger.remove()
 
     logpath = winreg.ExpandEnvironmentStrings("%appdata%\\ThomasPain\\ACARS\\logs")
@@ -66,90 +86,158 @@ def setup_logging():
 
 
 def start_new_thread(function, arguments, daemon=False):
-    # Creates a new thread and runs it
+    """
+    Creates a new thread and starts it
+
+    :return: nil
+    """
 
     threading.Thread(target=function, args=arguments, daemon=daemon).start()
 
 
 class PosPrinter:
-    def __init__(self, product_id, vendor_id, ignore_enable_flag=False):
+    """
+    Class to interface with the POS printer.
+    """
+
+    def __init__(self, product_id, vendor_id, test_mode=False):
+        """
+        Also does error handling
+
+        :param product_id: Printer product ID as integer
+        :param vendor_id: Printer vendor ID as integer
+        :param test_mode: boolean, when set to true modifies error messages and prevents modification of the global
+            settings. Used for print tests (duh)
+
+        :return: nil
+        """
+
         self.product_id = product_id
         self.vendor_id = vendor_id
 
         self._printer = None
 
-        ender = "\n\nPrinting disabled"
-        if ignore_enable_flag:
-            ender = ""
+        self.test_mode = test_mode
 
-        if not (SETTINGS["printer"]["enable"] and ignore_enable_flag):
+        # changes message end if test mode is true
+        message_end = "\n\nPrinting disabled"
+        if self.test_mode:
+            message_end = ""
+
+        self.failed = True  # can be used to determine if a popup was shown - set false if successful in try below
+
+        # in case printing is disabled (and test mode is disabled), just do nothing
+        # if it's in test mode, you want it to actually do stuff and test...
+        if not SETTINGS["printer"]["enable"] and not self.test_mode:
             return
 
-        self.failed = True
         try:
             self._printer = Usb(self.product_id, self.vendor_id)
             self._printer.hw("INIT")
             self.failed = False
         except escpos.exceptions.USBNotFoundError:
             popup_message("Printer not found - please check the printer is plugged in and turned on and that the vendor"
-                          f" and product IDs correct.{ender}",
+                          f" and product IDs correct.{message_end}",
                           error=True)
-            if ignore_enable_flag:
+            if not self.test_mode:
                 SETTINGS["printer"]["enable"] = False
         except USBError as e:
             if "Errno 13" in str(e):
-                popup_message(f"USB error 13 - it looks like something else is using the printer.\n\n{ender}",
+                popup_message(f"USB error 13 - it looks like something else is using the printer.\n\n{message_end}",
                               error=True)
-                if ignore_enable_flag:
+                if not self.test_mode:
                     SETTINGS["printer"]["enable"] = False
             else:
-                popup_message(f"{e}{ender}", error=True)
+                popup_message(f"{e}{message_end}", error=True)
                 logger.exception("Unrecognised USB error")
-                if ignore_enable_flag:
+                if not self.test_mode:
                     SETTINGS["printer"]["enable"] = False
         except NoBackendError:
-            popup_message(f"There was an issue connecting to the printer. Please refer to the documentation.{ender}",
+            print("nobackend")
+            popup_message(f"There was an issue connecting to the printer. Please refer to the documentation.{message_end}",
                           error=True)
             logger.exception("No backend was available - Possible mis-installation of libusb-1.0.dll or WinUSB driver.")
-            if ignore_enable_flag:
+            if not self.test_mode:
                 SETTINGS["printer"]["enable"] = False
 
     def print(self, data):
+        """
+        Prints data if printer is initialised.
+
+        :param data: binary data to send to POS printer
+        :return: nil
+        """
+
         if self._printer is None:
             helper.add_event((lambda: True), (lambda: popup_message("Printer not initialised.\n\nPrinting disabled.",
                                                                     error=True)))
-            SETTINGS["printer"]["enable"] = False
+            self.failed = True
+
+            if not self.test_mode:
+                SETTINGS["printer"]["enable"] = False
+
             return
         self._printer._raw(data)
 
     def close(self):
+        """
+        Closes printer connection
+
+        :return: nil
+        """
         self._printer = None
 
     def reset(self):
+        """
+        Closes and reopens printer connection
+
+        :return: nil
+        """
+
         self.close()
         try:
             self._printer = Usb(self.product_id, self.vendor_id)
-        except:
+        except:  # in the event of any error (eg NoBackendAvail)
+            # TODO: Change to raise an exception or do something other than this
             self._printer = None
 
     def update_ids(self, product_id, vendor_id):
+        """
+        Changes printer IDs and then resets
+
+        :param product_id: printer product ID as integer
+        :param vendor_id: printer vendor ID as integer
+        :return: nil
+        """
+
         self.product_id = product_id
         self.vendor_id = vendor_id
         self.reset()
 
 
 def request(mode, recipient, message):
+    """
+    Send a message to Hoppie if connected to the network - WILL MAKE GUI HANG. Disconnects on error.
+
+    TODO: Threading in here
+
+    :param mode: message type, eg telex, cpdlc, inforeq...
+    :param recipient: station name of the message recipent
+    :param message: see name
+    :return: boolean, true on success
+    """
+
     if station_name == "":
         popup_message("Select a callsign and connect to Hoppie before attempting to send messages", error=True)
-        return
+        return False
     elif not is_hoppie_connected:
         popup_message("Connect to Hoppie before attempting to send messages", error=True)
-        return
+        return False
 
     args = {"logon": LOGON_CODE, "from": station_name}
 
     ui.statusbar.showMessage("Sending message...")
-    ui.disconnectButton.setEnabled(False)
+    ui.disconnectButton.setEnabled(False)  # stops you from disconnecting
     ui.connectionStatusLabel.setText("Working...")
 
     try:
@@ -160,7 +248,7 @@ def request(mode, recipient, message):
         popup_message(f"Unable to send message due to a connection error.\n\n{str(e)}\n\nDisconnected.")
         stop_message_poll()
 
-        return
+        return False
 
     if not r.ok:
         popup_message(f"The URL that was set appears to be invalid because a HTTP {r.status_code} was returned. You can"
@@ -169,12 +257,12 @@ def request(mode, recipient, message):
         logger.error(f"URL invalid, returned {r.status_code}")
         stop_message_poll()
 
-        return
+        return False
 
     ui.disconnectButton.setEnabled(True)
     ui.connectionStatusLabel.setText("Connected")
 
-    if "error" in r.text[:5]:
+    if "error" in r.text[:5]:  # responses from hoppie that have an error always start with "error "
         ui.statusbar.showMessage("Unable to send message")
         popup_message(f"Error when sending message\n\"{r.text}\"", error=True)
         return False
@@ -189,8 +277,13 @@ def request(mode, recipient, message):
 
 
 def popup_message(text, error=False):
-    # Shows standard message dialog
-    # If error is set to true, an error soud will also be played asynchronously
+    """
+    Shows a standard message dialog
+
+    :param text: self explanatory
+    :param error: if message is an error or not, if so plays Windows error sound
+    :return: nil
+    """
 
     msg = QtWidgets.QMessageBox()
     msg.setText(text)
@@ -200,7 +293,12 @@ def popup_message(text, error=False):
 
 
 def popup_confirmation(text):
-    # Shows confirmation dialog and plays confirmation sound asynchronously
+    """
+    Shows confirmation dialog and plays confirmation sound asynchronously
+
+    :param text: come on...
+    :return: true or false, indicating user input.
+    """
     # Returns true or false
 
     confirm = QtWidgets.QMessageBox()
@@ -209,6 +307,13 @@ def popup_confirmation(text):
 
 
 def popup_input(text):
+    """
+    Gets a line of text as input from user.
+
+    :param text: :face_palm:
+    :return: inputted text as string if answered, else boolean false.
+    """
+
     text, ok_pressed = QtWidgets.QInputDialog.getText(None, "", text, QtWidgets.QLineEdit.Normal, "")
     if ok_pressed and text != "":
         return text
@@ -220,7 +325,16 @@ def popup_input(text):
 
 
 def print_message(message, header):
-    # Prints message based on set template with set formatting. Applies header specified also.
+    """
+    Prints a message through the POS printer with set formatting.
+    Does __not__ take note of the current enable setting for the printer.
+
+    TODO: Handle NoneType in any message field
+
+    :param message: instance of class HoppieMessage
+    :param header: string, printout header
+    :return: nil
+    """
 
     bold_emphasis = b"\x1b\x21\x08"  # Sets text to bold
     second_typeface_emphasis = b"\x1b\x21\x01"  # Selects font B (different code to actual font size stuff)
@@ -266,7 +380,9 @@ def print_message(message, header):
 
 
 class HoppieMessage:
-    # Message structure used for message interchange
+    """
+    Message structure used for message interchange
+    """
 
     def __init__(self):
         self.sender = None
@@ -277,9 +393,15 @@ class HoppieMessage:
 
 
 def hoppie_connection_thread():
-    # Function written to be run in it's own thread, polls SERVER_ADDR with specifc POST args
-    # Decodes response, and passes that to the handle_new_message function.
-    # If connection_kill_switch is set to true, the thread will end
+    """
+    Main thread that actually does the Hoppie stuff. Polls SERVER_ADDR with specifc POST args. Any response is decoded,
+        and passed to the handle_new_message functinon.
+    Loops forever until connection_kill_switch is set to true or an error is found.
+    is_hoppie_connected is to be used as an easy status indicator.
+    Should be run as its own thread.
+
+    :return: nil
+    """
 
     global connection_kill_switch
     global is_hoppie_connected
@@ -294,7 +416,8 @@ def hoppie_connection_thread():
 
         args = {"logon": LOGON_CODE, "from": station_name}
 
-        helper.add_event((lambda: True), (lambda: ui.statusbar.showMessage("Checking for new messages")))
+        helper.add_event((lambda: True), (lambda: ui.statusbar.showMessage("Checking for new messages")))  # the GUI
+        # event handler is not thread safe, it causes intermittent crashes
 
         try:
             r = session.post(SERVER_ADDR, data={**args, "type": "poll", "to": "SERVER"})
@@ -303,11 +426,15 @@ def hoppie_connection_thread():
 
             logger.exception("Error occurred during message polling")
 
+            is_hoppie_connected = False
+
+            # the following is done to ensure that correct logging is done in the message box
+
             def finfunc():
                 popup_message("Unable to connect to Hoppie.\n\nDisconnected.")
                 stop_message_poll()
 
-            helper.add_event((lambda: is_hoppie_connected is False), finfunc)
+            helper.add_event((lambda: True), finfunc)
 
             return
 
@@ -365,10 +492,14 @@ def hoppie_connection_thread():
 
 
 def begin_message_poll():
-    # Triggered by ui.connectButton
-    # Starts thread for SERVER_ADDR polling, disables ui.connectButton and enables ui.disconnectButton and updates the
-    #  status indicator label. It also logs the connection in the message log
-    # Checks to ensure a callsign is entered before performing any actions
+    """
+    Triggered by ui.connectButton
+    Starts thread for SERVER_ADDR polling, disables ui.connectButton and enables ui.disconnectButton and updates the
+        status indicator label. It also logs the connection in the message log
+    Checks to ensure a callsign is entered before anything is done
+
+    :return: nil
+    """
 
     global ui
     global connection_kill_switch
@@ -390,10 +521,14 @@ def begin_message_poll():
 
 
 def stop_message_poll():
-    # Triggered by ui.disconnectButton
-    # Triggers killswitch for SERVER_ADDR polling, disables ui.disconnectButton, sets ui.connectionStatusLabel to
-    #  "Working..." and creates a new helper event. If is_hoppie_connected is true, it executes finfunc. This enables
-    #  ui.connectButton, updates ui.connectionStatusLabel to disconnected and logs the disconnection in the message log.
+    """
+    Triggered by ui.disconnectButton
+    Triggers killswitch for SERVER_ADDR polling, disables ui.disconnectButton, sets ui.connectionStatusLabel to
+        "Working..." and creates a new helper event. If is_hoppie_connected is true, it executes finfunc. This enables
+        ui.connectButton, updates ui.connectionStatusLabel to disconnected and logs the disconnection in the message log
+
+    :return: nil
+    """
 
     global ui
     global connection_kill_switch
@@ -422,9 +557,13 @@ def stop_message_poll():
 
 
 def select_callsign():
-    # Triggered by ui.saveCallsignButton
-    # Takes contents of ui.callsignLineEdit, ensures something is there and that no polling is taking place and if all
-    #  is good the contents are stored in station_name and the status indicator label is updated.
+    """
+    Triggered by ui.saveCallsignButton
+    Takes contents of ui.callsignLineEdit, ensures something is there and that no polling is taking place and if all
+        is good the contents are stored in station_name and the status indicator label is updated.
+
+    :return: nil
+    """
 
     global ui
     global station_name
@@ -442,10 +581,15 @@ def select_callsign():
 
 
 def handle_new_message(message):
-    # Used by hoppie_connection_thread
-    # Plays a beep sound asynchronously, appends the entire message item to the message_log list, decodes it into a
-    #  single text line, appends that to message_log_text, calls helper.update to update the message log box, and if the
-    #  settings allow it, prints the message asynchronously.
+    """
+    Used by hoppie_connection_thread
+    Plays a beep sound asynchronously, appends the entire message item to the message_log list, decodes it into a
+        single text line, appends that to message_log_text, calls helper.update to update the message log box, and if the
+        settings allow it, prints the message asynchronously.
+
+    :param message: instance of HoppieMessage
+    :return: nil
+    """
 
     global ui
     global message_log
@@ -472,6 +616,7 @@ def handle_new_message(message):
 
 
 class HelperTool:
+    # TODO: These comments
     # Used by handle_new_message, clear_message_log, begin_message_poll and stop_message_poll through an instance
     #   defined as helper
     # Required due to QHandler not being thread safe, which causes intermittent crashes if ui is modified from another
@@ -695,10 +840,10 @@ def about_program():
 
     AboutProgramWindow = None
 
-    import about
+    from gui import about
 
-    AboutProgramWindow = QtWidgets.QWidget()
-    ui = about.Ui_Form()
+    AboutProgramWindow = QtWidgets.QDialog()
+    ui = about.Ui_Dialog()
     ui.setupUi(AboutProgramWindow)
 
     label = QtWidgets.QLabel(ui.imageWidget)
@@ -731,18 +876,19 @@ def about_program():
     return
 
 
-def about_inforeq():
-    global AboutInfoReqWindow
+def show_help(page_index):
+    global HelpWindow
 
-    import aboutInfoReq
-    AboutInfoReqWindow = QtWidgets.QWidget()
-    ui = aboutInfoReq.Ui_AboutInfoReq()
-    ui.setupUi(AboutInfoReqWindow)
-    ui.pushButton.clicked.connect(lambda: AboutInfoReqWindow.close())
-    AboutInfoReqWindow.show()
+    from gui import help
 
-    del aboutInfoReq
-    return
+    HelpWindow = QtWidgets.QDialog()
+    ui = help.Ui_Dialog()
+    ui.setupUi(HelpWindow)
+    ui.pushButton.clicked.connect(lambda: HelpWindow.close())
+    ui.tabWidget.setCurrentIndex(page_index)
+    HelpWindow.show()
+
+    del help
 
 
 def show_settings():
@@ -789,9 +935,12 @@ def show_settings():
 
         dp.cut()
 
+        test_handle = None
+
         test_handle = PosPrinter(int("0x" + SettingsUi.printProductIDLine.text(), base=16),
                                  int("0x" + SettingsUi.printVendorIDLine.text(), base=16),
-                                 ignore_enable_flag=True)
+                                 test_mode=True)
+
         if test_handle.failed:
             return
 
@@ -889,10 +1038,10 @@ def show_settings():
     global SettingsWindow
     global SettingsUi
 
-    import settings as SettingsGUI
+    from gui import settings as SettingsGUI
 
-    SettingsWindow = QtWidgets.QWidget()
-    SettingsUi = SettingsGUI.Ui_SettingsWindow()
+    SettingsWindow = QtWidgets.QDialog()
+    SettingsUi = SettingsGUI.Ui_Dialog()
     SettingsUi.setupUi(SettingsWindow)
 
     # prefill values
@@ -929,11 +1078,10 @@ setup_logging()
 app = QtWidgets.QApplication(sys.argv)
 # Setup GUI
 MainWindow = QtWidgets.QMainWindow()
-ui = gui.Ui_MainWindow()
+ui = maingui.Ui_MainWindow()
 ui.setupUi(MainWindow)
 
 helper = HelperTool()
-pos = PosPrinter(int(SETTINGS["printer"]["product"], base=16), int(SETTINGS["printer"]["vendor"], base=16))
 
 ui.exitMenuAction.triggered.connect(lambda: sys.exit())
 ui.aboutMenuAction.triggered.connect(lambda: about_program())
@@ -950,9 +1098,11 @@ ui.printLastMessageButton.clicked.connect(lambda: print_last_message())
 
 ui.telexSendButton.clicked.connect(lambda: send_telex())
 ui.infoSendButton.clicked.connect(lambda: send_inforeq())
-ui.infoTypeHelpButton.clicked.connect(lambda: about_inforeq())
+ui.infoTypeHelpButton.clicked.connect(lambda: show_help(0))
 ui.cpdlcSendButton.clicked.connect(lambda: send_cpdlc())
+ui.cpdlcReplyHelpButton.clicked.connect(lambda: show_help(1))
 
+pos = PosPrinter(int(SETTINGS["printer"]["product"], base=16), int(SETTINGS["printer"]["vendor"], base=16))
 # shows gui
 MainWindow.show()
 sys.exit(app.exec_())

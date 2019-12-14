@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="windowModality">
+   <enum>Qt::ApplicationModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>411</width>
+    <height>251</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>411</width>
+    <height>251</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>411</width>
+    <height>251</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>Help</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <widget class="QTabWidget" name="tabWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>391</width>
+     <height>201</height>
+    </rect>
+   </property>
+   <property name="currentIndex">
+    <number>0</number>
+   </property>
+   <widget class="QWidget" name="tab">
+    <attribute name="title">
+     <string>InfoReq</string>
+    </attribute>
+    <widget class="QLabel" name="label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>361</width>
+       <height>121</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>For an InfoReq message, you can choose to either request a METAR, short TAF, TAF or VATSIM ATIS text from VATSIM for the airport supplied in the &quot;Airport&quot; field as an ICAO code. If you request a METAR or either type of TAF, data is pulled from NOAA by Hoppie then relayed back to you. If you choose a VATSIM ATIS, Hoppie will take the ATIS text from VATSIM if there is a controller online and broadcasting an ATIS for that airport. If not, a message is returned saying &quot;not available&quot;.</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="tab_2">
+    <attribute name="title">
+     <string>CPDLC</string>
+    </attribute>
+    <widget class="QLabel" name="label_2">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>361</width>
+       <height>161</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>When sending a CPDLC message, you need to specify what response is expected from the other party.
+&quot;Yes&quot; and &quot;No&quot; are the only ones specified by an airplane, which are used to specify if they require a response from ATC. The rest are usually used by ATC to specify what response they require from the airplane. This response should be placed in the message box.
+If you check the &quot;response&quot; box, you will be asked for the message ID that you are responding to. This can be found in the message content, using the plan below:
+
+/data2/{message ID of this message}/{message ID which this is responding to (can be ommitted)}/{response type required}/{message content}</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QPushButton" name="pushButton">
+   <property name="geometry">
+    <rect>
+     <x>270</x>
+     <y>220</y>
+     <width>111</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Close</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
