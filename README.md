@@ -10,7 +10,7 @@ Only Windows is supported (will ~~possibly~~ absolutely not run on Linux)
 
 Installation is simple:
 
-* Either run the installer, or
+* ~~Either run the installer, or~~
 * Install the required dependencies yourself
 
 If you choose to install the dependencies yourself, you should first begin with an installation of Python 3.7 (64 or 32 bit, whichever your operating system is). Into this, install
